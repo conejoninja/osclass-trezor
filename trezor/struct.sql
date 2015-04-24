@@ -1,0 +1,8 @@
+CREATE TABLE  /*TABLE_PREFIX*/t_trezor (
+  s_address VARCHAR( 34 ) NOT NULL ,
+  fk_i_user_id INT NOT NULL ,
+
+  PRIMARY KEY (s_address)
+) ENGINE=MyISAM DEFAULT CHARACTER SET 'UTF8' COLLATE 'UTF8_GENERAL_CI';
+
+
