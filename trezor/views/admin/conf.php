@@ -10,6 +10,23 @@ $origin = $url['scheme'] . '://' . $url['host'];
     .theme-files { min-width: 500px; }
 </style>
 <h2 class="render-title"><?php _e('Trezor login information', 'trezor'); ?> <span style="font-size: 12px;"><a href="<?php echo osc_route_admin_url('trezor-admin-help'); ?>" ><?php _e('Help setting my login button', 'trezor'); ?></a></span></h2>
+<form action="<?php echo osc_route_admin_url('trezor-conf'); ?>" method="post" class="nocsrf">
+    <input type="hidden" name="action_specific" value="trezor_settings" />
+    <fieldset>
+        <div class="form-horizontal">
+            <div class="form-row">
+                <div class="form-label"><?php _e('Affiliate code','trezor'); ?></div>
+                <div class="form-controls">
+                    <input type="text" name="affiliate" id="affiliate" value="<?php echo osc_esc_html(osc_get_preference('affiliate_code', 'trezor')); ?>"/>
+                </div>
+                <div class="help-box"><?php _e('You could find your Affiliate code at your <a href="https://www.buytrezor.com/user/profile/affiliate/">BuyTrezor profile</a> page.','trezor'); ?></div>
+            </div>
+            <div class="form-actions">
+                <input id="button_save" type="submit" value="<?php echo osc_esc_html(__('Save','trezor')); ?>" class="btn btn-submit">
+            </div>
+        </div>
+    </fieldset>
+</form>
 <?php $logo_prefence = osc_get_preference('logo', 'trezor'); ?>
 <?php if( is_writable( osc_uploads_path()) ) { ?>
     <?php if($logo_prefence) { ?>

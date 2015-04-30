@@ -18,14 +18,14 @@ if(isset($trezor['s_address'])) {
 ?><div class="wrapper wrapper-flash">
     <div id="flash_js"></div>
 </div>
-<h2><?php _e('Trezor device', 'trezor'); ?></h2>
+<h2><?php _e('TREZOR device', 'trezor'); ?></h2>
 <?php if($trezor_linked) {
 
-    echo '<div>' . sprintf(__('You could log in with the address : %s', 'trezor'), @$trezor['s_address']) . ' <a href="' . osc_route_url('trezor-manage') . '?unlink=' . substr(@$trezor['s_address'], 0, 10) . '">' . __('Unlink account', 'trezor') . '</a></div>';
+    echo '<div>' . sprintf(__('TREZOR device is linked to your account. <a href="%s" onclick="return confirm(\'Are you sure to unlink your account?\');" >Unlink account</a>', 'trezor'), osc_route_url('trezor-manage') . '?unlink=' . substr(@$trezor['s_address'], 0, 10)) . '</div>';
 
 } else {
 
-    echo '<div>' . __('To link your Trezor device with your current account you need to click on the button and connect your device.', 'trezor') . '</div>';
+    echo '<div>' . __('To link your TREZOR device with your current account you need to click on the button and connect your device.', 'trezor') . '</div>';
     echo '<br/>';
     echo '<div>';
         trezor_button('trezor_link');
