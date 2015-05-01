@@ -5,7 +5,7 @@ $trezor = ModelTrezor::newInstance()->findByUser(osc_logged_user_id());
 
 if(Params::getParam('unlink')!='') {
     if(isset($trezor['s_address']) && substr($trezor['s_address'], 0, 10)==Params::getParam('unlink')) {
-        ModelTrezor::newInstance()->delete(array('fk_i_user_id' => osc_logged_user_id()));
+        ModelTrezor::newInstance()->delete(array('fk_i_user_id' => osc_logged_user_id(), 'b_admin' => 0));
         ob_get_clean();
         osc_redirect_to(osc_route_url('trezor-manage'));
     }

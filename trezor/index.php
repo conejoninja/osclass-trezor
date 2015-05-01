@@ -3,7 +3,7 @@
 Plugin Name: Trezor Connect
 Plugin URI: trezor
 Description: Use Trezor Connect as a login for your users
-Version: 1.1.0
+Version: 1.2.0
 Author: _CONEJO
 Author URI: http://www.conejo.me/
 Short Name: trezor
@@ -24,8 +24,12 @@ Plugin update URI: trezor
         ModelTrezor::newInstance()->uninstall();
     }
 
+    function trezor_update() {
+        ModelTrezor::newInstance()->updateVersion();
+    }
+
     osc_add_hook('trezor_button', 'trezor_button');
-    function trezor_button($hook = 'trezor') {
+    function trezor_button($hook = 'trezor', $admin = false) {
         if($hook!='trezor_link') {
             $hook = 'trezor';
         }
@@ -33,9 +37,9 @@ Plugin update URI: trezor
             ?>
             <div id="trezor_button">
                 <?php if($hook=="trezor_link") {
-                    trezor_link_script();
+                    trezor_link_script($admin);
                 } else {
-                    trezor_login_script();
+                    trezor_login_script($admin);
                 };?>
                 <trezor:login callback="trezorLogin" icon="<?php echo trezor_logo(); ?>">
                 </trezor:login>
@@ -92,6 +96,7 @@ Plugin update URI: trezor
         $challenge_visual = Params::getParam('challenge_visual');
         $public_key = strtolower(Params::getParam('public_key'));
         $signature = strtolower(Params::getParam('signature'));
+        $admin = Params::getParam('admin')=='1'?1:0;
 
         $message = hex2bin($challenge_hidden) . $challenge_visual;
 
@@ -105,24 +110,42 @@ Plugin update URI: trezor
 
         if($success) {
             $address = $ecdsa->getAddress($public_key);
-            $user = ModelTrezor::newInstance()->findByPrimaryKey($address);
+            $user = ModelTrezor::newInstance()->findByAddress($address, $admin);
             if(isset($user['fk_i_user_id'])) {
-                require_once LIB_PATH . 'osclass/UserActions.php';
-                $uActions = new UserActions(false);
-                $logged = $uActions->bootstrap_login($user['fk_i_user_id']);
+                if($admin===1) {
+                    $user = Admin::newInstance()->findByPrimaryKey($user['fk_i_user_id']);
+                    if( !$user ) {
+                        echo json_encode(array('success' => false, 'error' => __("The user doesn't exist", 'trezor')));
+                        die;
+                    }
 
-                if($logged==0) {
-                    echo json_encode(array('success' => false, 'error' => __("The user doesn't exist", 'trezor')));
-                } else if($logged==1) {
-                    echo json_encode(array('success' => false, 'error' => __('The user has not been validated yet', 'trezor')));
-                } else if($logged==2) {
-                    echo json_encode(array('success' => false, 'error' => __('The user has been suspended', 'trezor')));
-                } else if($logged==3) {
+                    Session::newInstance()->_set('adminId', $admin['pk_i_id']);
+                    Session::newInstance()->_set('adminUserName', $admin['s_username']);
+                    Session::newInstance()->_set('adminName', $admin['s_name']);
+                    Session::newInstance()->_set('adminEmail', $admin['s_email']);
+                    Session::newInstance()->_set('adminLocale', Params::getParam('locale'));
+
                     echo json_encode(array('success' => true, 'error' => __('The user has been signed in correctly', 'trezor')));
+                    die;
+
                 } else {
-                    echo json_encode(array('success' => false, 'error' => __('This should never happen', 'trezor')));
+                    require_once LIB_PATH . 'osclass/UserActions.php';
+                    $uActions = new UserActions(false);
+                    $logged = $uActions->bootstrap_login($user['fk_i_user_id']);
+
+                    if($logged==0) {
+                        echo json_encode(array('success' => false, 'error' => __("The user doesn't exist", 'trezor')));
+                    } else if($logged==1) {
+                        echo json_encode(array('success' => false, 'error' => __('The user has not been validated yet', 'trezor')));
+                    } else if($logged==2) {
+                        echo json_encode(array('success' => false, 'error' => __('The user has been suspended', 'trezor')));
+                    } else if($logged==3) {
+                        echo json_encode(array('success' => true, 'error' => __('The user has been signed in correctly', 'trezor')));
+                    } else {
+                        echo json_encode(array('success' => false, 'error' => __('This should never happen', 'trezor')));
+                    }
+                    die;
                 }
-                die;
             }
             echo json_encode(array('success' => false, 'error' => __('Unlinked TREZOR device. Please login into your account and go to TREZOR device section to link it.', 'trezor')));
         } else {
@@ -139,6 +162,7 @@ Plugin update URI: trezor
         $challenge_visual = Params::getParam('challenge_visual');
         $public_key = strtolower(Params::getParam('public_key'));
         $signature = strtolower(Params::getParam('signature'));
+        $admin = Params::getParam('admin')=='1'?1:0;
 
         $message = hex2bin($challenge_hidden) . $challenge_visual;
 
@@ -157,17 +181,22 @@ Plugin update URI: trezor
 
         if($success) {
             $address = $ecdsa->getAddress($public_key);
-            $user = ModelTrezor::newInstance()->findByPrimaryKey($address);
-            if(!isset($user['fk_i_user_id']) && osc_is_web_user_logged_in()) {
-                $user = User::newInstance()->findByPrimaryKey(osc_logged_user_id());
+            $user = ModelTrezor::newInstance()->findByAddress($address, $admin);
+            if(!isset($user['fk_i_user_id']) && (($admin===1 && osc_is_admin_user_logged_in()) || ($admin===0 && osc_is_web_user_logged_in()))) {
+                if ($admin === 1) {
+                    $user = Admin::newInstance()->findByPrimaryKey(osc_logged_admin_id());
+                } else {
+                    $user = User::newInstance()->findByPrimaryKey(osc_logged_user_id());
+                }
                 if ( !osc_verify_password(Params::getParam('x'), (isset($user['s_password'])?$user['s_password']:'') )) {
                     echo json_encode(array('success' => false, 'error' => __('Wrong password', 'trezor')));
                     die;
                 } else {
                     ModelTrezor::newInstance()->insert(
                         array(
-                            'fk_i_user_id' => osc_logged_user_id(),
-                            's_address' => $address
+                            'fk_i_user_id' => $user['pk_i_id'],
+                            's_address' => $address,
+                            'b_admin' => $admin
                         )
                     );
                     echo json_encode(array('success' => true, 'error' => __('Account linked correctly', 'trezor')));
@@ -197,6 +226,12 @@ Plugin update URI: trezor
     }
     osc_add_hook('admin_menu_init', 'trezor_admin_menu');
 
+    function trezor_admin_manage($admin) {
+        if(@$admin['pk_i_id']==osc_logged_admin_id()) {
+            include TREZOR_PATH . 'views/admin/manage.php';
+        }
+    }
+    osc_add_hook('admin_profile_form', 'trezor_admin_manage');
 
     function trezor_actions_admin() {
         switch( Params::getParam('action_specific') ) {
@@ -258,7 +293,7 @@ Plugin update URI: trezor
         return osc_base_url() . 'oc-content/plugins/trezor/img/logo.png';
     }
 
-    function trezor_login_script() {
+    function trezor_login_script($admin = false) {
         list($csrfname, $csrftoken) = osc_csrfguard_generate_token();
         ?>
         <script type="text/javascript">
@@ -273,6 +308,7 @@ Plugin update URI: trezor
                             challenge_hidden: response.challenge_hidden,
                             challenge_visual: response.challenge_visual,
                             public_key: response.public_key,
+                            <?php if($admin) { echo "admin: '1',"; }; ?>
                             signature: response.signature,
                             CSRFName: '<?php echo $csrfname; ?>',
                             CSRFToken: '<?php echo $csrftoken?>'
@@ -296,7 +332,7 @@ Plugin update URI: trezor
 
     <?php }
 
-    function trezor_link_script() {
+    function trezor_link_script($admin = false) {
         list($csrfname, $csrftoken) = osc_csrfguard_generate_token();
         ?>
         <div id="dialog-trezor" style="display: none;">
@@ -325,16 +361,19 @@ Plugin update URI: trezor
             trezorlink.page = 'ajax';
             trezorlink.action = 'runhook';
             trezorlink.hook = 'trezor_link';
+            <?php if($admin) { echo "trezorlink.admin = '1';"; }; ?>
             trezorlink.CSRFName = '<?php echo $csrfname; ?>';
             trezorlink.CSRFToken = '<?php echo $csrftoken?>';
             $("#dialog-trezor").dialog({
                 autoOpen: false,
                 modal: true,
+                <?php if($admin) { echo 'minHeight: 200,'; }; ?>
                 title: '<?php echo osc_esc_js( __('Input your password', 'trezor') ); ?>'
             });
             $("#dialog-trezor-wait").dialog({
                 autoOpen: false,
                 modal: true,
+                <?php if($admin) { echo 'minHeight: 200,'; }; ?>
                 title: '<?php echo osc_esc_js( __('Loading data', 'trezor') ); ?>'
             });
             function trezorLogin(response) {
@@ -377,11 +416,44 @@ Plugin update URI: trezor
 
     <?php }
 
+    function trezor_admin_login() {
+        echo '<div style="display:none;">';
+        trezor_button('login', true);
+        echo '</div>';
+        ?>
+        <script type="text/javascript">
+            $(document).ready(function() {
+
+                $("#loginform").after('<div style="float:right;" id="trezor_button"><trezor:login callback="trezorLogin" icon="<?php echo trezor_logo(); ?>"></trezor:login></div>');
+                var elements = document.getElementsByTagName('trezor:login');
+                for (var i = 0; i < elements.length; i++) {
+                    var e = elements[i];
+                    window.connect_data = {
+                        'callback': e.getAttribute('callback'),
+                        'hosticon': e.getAttribute('icon'),
+                        'challenge_hidden': e.getAttribute('challenge_hidden') || Array.apply(null, Array(64)).map(function () {
+                            return Math.floor(Math.random() * 16).toString(16);
+                        }).join(''),
+                        'challenge_visual': e.getAttribute('challenge_visual') || new Date().toISOString().substring(0, 19).replace('T', ' ')
+                    };
+                    e.parentNode.innerHTML = content;
+                }
+
+
+            });
+        </script>
+
+        <?php
+
+    }
+    osc_add_hook('login_admin_form', 'trezor_admin_login');
+
     osc_add_route('trezor-admin-help', 'trezor/admin/help', 'trezor/admin/help', 'trezor/views/admin/help.php');
     osc_add_route('trezor-admin-conf', 'trezor/admin/conf', 'trezor/admin/conf', 'trezor/views/admin/conf.php');
     osc_add_route('trezor-manage', 'trezor/manage', 'trezor/manage', 'trezor/views/user/manage.php', true);
 
-    osc_register_plugin(osc_plugin_path(TREZOR_PATH), 'trezor_install');
-    osc_add_hook(osc_plugin_path(TREZOR_PATH)."_uninstall", 'trezor_uninstall');
+    osc_register_plugin(osc_plugin_path(TREZOR_PATH . 'index.php'), 'trezor_install');
+    osc_add_hook(osc_plugin_path(TREZOR_PATH . 'index.php')."_uninstall", 'trezor_uninstall');
+    osc_add_hook(osc_plugin_path(TREZOR_PATH . 'index.php')."_enable", 'trezor_update');
     osc_enqueue_script('jquery-ui');
 
