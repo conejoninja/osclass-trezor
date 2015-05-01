@@ -3,7 +3,7 @@ CREATE TABLE  /*TABLE_PREFIX*/t_trezor (
   fk_i_user_id INT NOT NULL ,
   b_admin TINYINT(1) NOT NULL DEFAULT 0,
 
-  PRIMARY KEY (s_address)
+  PRIMARY KEY (s_address, b_admin)
 ) ENGINE=MyISAM DEFAULT CHARACTER SET 'UTF8' COLLATE 'UTF8_GENERAL_CI';
 
 
