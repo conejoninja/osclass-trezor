@@ -3,7 +3,7 @@
 Plugin Name: Trezor Connect
 Plugin URI: trezor
 Description: Use Trezor Connect as a login for your users
-Version: 1.2.0
+Version: 1.2.1
 Author: _CONEJO
 Author URI: http://www.conejo.me/
 Short Name: trezor
@@ -119,13 +119,13 @@ Plugin update URI: trezor
                         die;
                     }
 
-                    Session::newInstance()->_set('adminId', $admin['pk_i_id']);
-                    Session::newInstance()->_set('adminUserName', $admin['s_username']);
-                    Session::newInstance()->_set('adminName', $admin['s_name']);
-                    Session::newInstance()->_set('adminEmail', $admin['s_email']);
+                    Session::newInstance()->_set('adminId', $user['pk_i_id']);
+                    Session::newInstance()->_set('adminUserName', $user['s_username']);
+                    Session::newInstance()->_set('adminName', $user['s_name']);
+                    Session::newInstance()->_set('adminEmail', $user['s_email']);
                     Session::newInstance()->_set('adminLocale', Params::getParam('locale'));
 
-                    echo json_encode(array('success' => true, 'error' => __('The user has been signed in correctly', 'trezor')));
+                    echo json_encode(array('success' => true, 'error' => __('The user has been signed in correctly.', 'trezor')));
                     die;
 
                 } else {
@@ -315,7 +315,11 @@ Plugin update URI: trezor
                         },
                         function (response) {
                             if (response.success) {
-                                window.location.reload(false);
+                                <?php if($admin) {
+                                    echo 'window.location = "' . osc_admin_base_url() . '";';
+                                } else {
+                                    echo 'window.location.reload(false);';
+                                }?>
                             } else if (response.error == 1) {
                                 alert('<?php _e('Failure:', 'trezor'); ?>\n\n' + response.msg);
                             } else {

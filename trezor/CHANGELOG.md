@@ -1,6 +1,10 @@
 Trezor login
 ============
 
+##version 1.2.1 - 05/05/2015
+
+* Minor fixes
+
 ##version 1.2.0 - 01/05/2015
 
 * Support for admin login too
