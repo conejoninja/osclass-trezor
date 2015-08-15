@@ -1,6 +1,10 @@
 Trezor login
 ============
 
+##version 1.3.0 - 15/08/2015
+
+* Compatible with up-coming firmware 1.3.4
+
 ##version 1.2.1 - 05/05/2015
 
 * Minor fixes

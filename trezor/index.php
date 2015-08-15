@@ -3,7 +3,7 @@
 Plugin Name: Trezor Connect
 Plugin URI: trezor
 Description: Use Trezor Connect as a login for your users
-Version: 1.2.1
+Version: 1.3.0
 Author: _CONEJO
 Author URI: http://www.conejo.me/
 Short Name: trezor
@@ -28,8 +28,21 @@ Plugin update URI: trezor
         ModelTrezor::newInstance()->updateVersion();
     }
 
+    function trezor_hidden_challenge() {
+        if(function_exists('openssl_random_pseudo_bytes')) {
+            return bin2hex(openssl_random_pseudo_bytes(32));
+        }
+        $str = '';
+        for($i=0;$i<64;$i++) {
+            $str .= dechex(mt_rand(0, 15));
+        }
+        return $str;
+    }
+
     osc_add_hook('trezor_button', 'trezor_button');
     function trezor_button($hook = 'trezor', $admin = false) {
+        $trezor_challenge_hidden = trezor_hidden_challenge();
+        $trezor_challenge_visual = date('Y-m-d H:i:s');
         if($hook!='trezor_link') {
             $hook = 'trezor';
         }
@@ -41,53 +54,66 @@ Plugin update URI: trezor
                 } else {
                     trezor_login_script($admin);
                 };?>
-                <trezor:login callback="trezorLogin" icon="<?php echo trezor_logo(); ?>">
+                <trezor:login callback="trezorLogin" challenge_hidden="<?php echo $trezor_challenge_hidden; ?>" challenge_visual="<?php echo $trezor_challenge_visual; ?>" icon="<?php echo trezor_logo(); ?>">
                 </trezor:login>
 
 
                 <script type="text/javascript">
+                    window.connect_data = {};
+
                     var elements = document.getElementsByTagName('trezor:login');
-                    var origin = 'https://trezor.github.io';
-                    var connect_path = origin + '/connect/';
-                    var content = '<a style="font-family: Helvetica, Arial, sans-serif; font-size: 14px; display: block; padding: 6px 12px; margin-bottom: 0; font-weight: normal; line-height: 1.42857143; text-align: center; white-space: nowrap; vertical-align: middle; cursor: pointer; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; border: 1px solid transparent; border-radius: 4px; text-decoration: none; position:relative; padding-left:44px; width:136px; color:#fff; background-color:#59983b; border-color:rgba(0,0,0,0.2);" onmouseover="this.style.background=\'#43732d\';" onmouseout="this.style.background=\'#59983b\';" onclick="trezor_login_handler();"><span style="position:absolute; left:0; top:0; bottom:0; width:32px; line-height:34px; font-size:1.6em; text-align:center; border-right:1px solid rgba(0,0,0,0.2); background: url(\'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABWklEQVRYw+2WPUsDQRCGZ0w0RRQUCwUllT9AFAQra/+BjYiQRgRBBFv/goWFlVjaBm1SCVpZiIKgha1iI4iFXxDz2MzBEe6SveOWIOwLx3I7X+/NzuyNSEBADgDrQAN4Al6AU2ADKPkOPAk0ScclUPNJIB78ETgEDoD72P6Vl0xY2iMcA5WYrGxEImz7INCIfXklQV4CbkznwtXvQAYO87Y2VfWnU6iqvyJyZq+zrseQhcCUrc9ddCLZiD2FEuhbzy92FJgrjoClXv7VgcCriIzn5P+hqsPdFMoOTgZT9r9E5NOOsSoiQzn998zAeyylC0AV0JQ2HAOWgVuz+S6SwEoGmxNXAn3vgkAgEPgXV3HUhg/ALjDdRXcO2AfefNwDEdrAOVAHRm1M2wHuEv4HhRBYtVGslRQgZb9lNmtFD6RbNvMloW1D6SYw4bsuZoA9q4trq42aBATkwB8MsRcDkn7CNQAAAABJRU5ErkJggg==\') no-repeat;"></span><?php printf(__('Sign in with %s', 'trezor'), '<strong>TREZOR</strong>'); ?></a><span style="display: block;font-family: Helvetica, Arial, sans-serif; font-size: 9px; width: 192px; text-align: right; margin-top: 2px;line-height:normal;"><a href="https://www.bitcointrezor.com/<?php echo osc_get_preference('affiliate_code', 'trezor')!=''?'?a='.osc_get_preference('affiliate_code', 'trezor'):''; ?>" target="_blank" style="text-decoration: none; color: #59983b;"><?php _e('What is TREZOR?', 'trezor'); ?></a></span>';
+                    var connect_origin = 'https://trezor.github.io';
+                    var connect_path = connect_origin + '/connect/';
+
+                    var content_css = '<style type="text/css">@import url("'+connect_path+'button.css")</style>';
+
+                    var content_html = '<div id="trezorconnect-wrapper"><a id="trezorconnect-button" onclick="trezor_login_handler(\'@callback@\', \'@hosticon@\', \'@challenge_hidden@\', \'@challenge_visual@\');"><span id="trezorconnect-icon"></span><?php printf(__('Sign in with %s', 'trezor'), '<strong>TREZOR</strong>'); ?></a><span id="trezorconnect-info"><a id="trezorconnect-infolink" href="https://www.buytrezor.com/<?php echo osc_get_preference('affiliate_code', 'trezor')!=''?'?a='.osc_get_preference('affiliate_code', 'trezor'):''; ?>" target="_blank"><?php _e('What is TREZOR?', 'trezor'); ?></a></div>';
 
                     for (var i = 0; i < elements.length; i++) {
                         var e = elements[i];
-                        window.connect_data = {
-                            'callback': e.getAttribute('callback'),
-                            'hosticon': e.getAttribute('icon'),
-                            'challenge_hidden': e.getAttribute('challenge_hidden') || Array.apply(null, Array(64)).map(function () {
-                                return Math.floor(Math.random() * 16).toString(16);
-                            }).join(''),
-                            'challenge_visual': e.getAttribute('challenge_visual') || new Date().toISOString().substring(0, 19).replace('T', ' ')
-                        };
-                        e.parentNode.innerHTML = content;
+                        callback = e.getAttribute('callback') || '';
+                        hosticon = e.getAttribute('icon') || '';
+                        challenge_hidden = e.getAttribute('challenge_hidden') || '';
+                        challenge_visual = e.getAttribute('challenge_visual') || '';
+                        e.parentNode.innerHTML = content_css + content_html.replace('@callback@', callback).replace('@hosticon@', hosticon).replace('@challenge_hidden@', challenge_hidden).replace('@challenge_visual@', challenge_visual);
                     }
 
                     function receiveMessage(event) {
-                        if (event.origin !== origin) return;
-                        window[window.connect_data.callback](event.data);
+                        if (event.origin !== connect_origin) return;
+                        if (window.connect_data.interval) {
+                            clearInterval(window.connect_data.interval);
+                        }
+                        if (window.connect_data.callback) {
+                            window[window.connect_data.callback](event.data);
+                        }
                     }
 
                     window.addEventListener('message', receiveMessage, false);
 
-                    function trezor_login_handler() {
+                    function trezor_login_handler(callback, hosticon, challenge_hidden, challenge_visual) {
                         var w = 500, h = 400, x = (screen.width - w) / 2, y = (screen.height - h) / 3;
-                        var popup = window.open(connect_path + 'login.html', 'trezor_login_window', 'height=' + h + ',width=' + w + ',left=' + x + ',top=' + y + ',menubar=no,toolbar=no,location=no,personalbar=no,status=no');
-                        // give some time to popup to open, then send request
-                        setTimeout(function () {
+                        var popup = window.open(connect_path + 'login.html', 'trezor_login_window', 'height='+h+',width='+w+',left='+x+',top='+y+',menubar=no,toolbar=no,location=no,personalbar=no,status=no');
+                        window.connect_data.callback = callback;
+                        // repeatedly sent request
+                        window.connect_data.interval = setInterval(function() {
                             var request = {};
                             request.trezor_login = true;
-                            request.challenge_hidden = window.connect_data.challenge_hidden;
-                            request.challenge_visual = window.connect_data.challenge_visual;
-                            request.icon = window.connect_data.hosticon;
-                            popup.postMessage(request, origin);
-                        }, 1500);
+                            request.icon = hosticon || 'https://trezor.github.io/connect/trezor.png';
+                            request.challenge_hidden = challenge_hidden || Array.apply(null, Array(64)).map(function () {return Math.floor(Math.random()*16).toString(16);}).join('');
+                            request.challenge_visual = challenge_visual || new Date().toISOString().substring(0,19).replace('T',' ');
+                            popup.postMessage(request, connect_origin);
+                        }, 250);
                     }
+
                 </script>
             </div>
         <?php
+            return array($trezor_challenge_hidden, $trezor_challenge_visual);
         };
+    }
+
+    function trezor_sha256($data) {
+        return hash('sha256', $data, true);
     }
 
     function trezor_ajax() {
@@ -96,9 +122,16 @@ Plugin update URI: trezor
         $challenge_visual = Params::getParam('challenge_visual');
         $public_key = strtolower(Params::getParam('public_key'));
         $signature = strtolower(Params::getParam('signature'));
+        $version = Params::getParam('version');
         $admin = Params::getParam('admin')=='1'?1:0;
 
-        $message = hex2bin($challenge_hidden) . $challenge_visual;
+        if ($version == 1) {
+            $message = hex2bin($challenge_hidden) . $challenge_visual;
+        } elseif ($version == 2) {
+            $message = trezor_sha256(hex2bin($challenge_hidden)) . trezor_sha256($challenge_visual);
+        } else {
+            die('Unknown version');
+        }
 
         $R = substr($signature, 2, 64);
         $S = substr($signature, 66, 64);
@@ -162,9 +195,16 @@ Plugin update URI: trezor
         $challenge_visual = Params::getParam('challenge_visual');
         $public_key = strtolower(Params::getParam('public_key'));
         $signature = strtolower(Params::getParam('signature'));
+        $version = Params::getParam('version');
         $admin = Params::getParam('admin')=='1'?1:0;
 
-        $message = hex2bin($challenge_hidden) . $challenge_visual;
+        if ($version == 1) {
+            $message = hex2bin($challenge_hidden) . $challenge_visual;
+        } elseif ($version == 2) {
+            $message = trezor_sha256(hex2bin($challenge_hidden)) . trezor_sha256($challenge_visual);
+        } else {
+            die('Unknown version');
+        }
 
         $R = substr($signature, 2, 64);
         $S = substr($signature, 66, 64);
@@ -307,6 +347,7 @@ Plugin update URI: trezor
                             hook: 'trezor',
                             challenge_hidden: response.challenge_hidden,
                             challenge_visual: response.challenge_visual,
+                            version: response.version,
                             public_key: response.public_key,
                             <?php if($admin) { echo "admin: '1',"; }; ?>
                             signature: response.signature,
@@ -385,6 +426,7 @@ Plugin update URI: trezor
                     trezorlink.challenge_hidden = response.challenge_hidden;
                     trezorlink.challenge_visual = response.challenge_visual;
                     trezorlink.public_key = response.public_key;
+                    trezorlink.version = response.version;
                     trezorlink.signature = response.signature;
                     $("#dialog-trezor").dialog('open');
                 } else {
@@ -422,28 +464,20 @@ Plugin update URI: trezor
 
     function trezor_admin_login() {
         echo '<div style="display:none;">';
-        trezor_button('login', true);
+        list($trezor_challenge_hidden, $trezor_challenge_visual) = trezor_button('login', true);
         echo '</div>';
         ?>
         <script type="text/javascript">
             $(document).ready(function() {
-
-                $("#loginform").after('<div style="float:right;" id="trezor_button"><trezor:login callback="trezorLogin" icon="<?php echo trezor_logo(); ?>"></trezor:login></div>');
-                var elements = document.getElementsByTagName('trezor:login');
+                $("#loginform").after('<div style="float:right;" id="trezor_button"><trezor:login callback="trezorLogin" challenge_hidden="<?php echo $trezor_challenge_hidden; ?>" challenge_visual="<?php echo $trezor_challenge_visual; ?>" icon="<?php echo trezor_logo(); ?>"></trezor:login></div>');
                 for (var i = 0; i < elements.length; i++) {
                     var e = elements[i];
-                    window.connect_data = {
-                        'callback': e.getAttribute('callback'),
-                        'hosticon': e.getAttribute('icon'),
-                        'challenge_hidden': e.getAttribute('challenge_hidden') || Array.apply(null, Array(64)).map(function () {
-                            return Math.floor(Math.random() * 16).toString(16);
-                        }).join(''),
-                        'challenge_visual': e.getAttribute('challenge_visual') || new Date().toISOString().substring(0, 19).replace('T', ' ')
-                    };
-                    e.parentNode.innerHTML = content;
+                    callback = e.getAttribute('callback') || '';
+                    hosticon = e.getAttribute('icon') || '';
+                    challenge_hidden = e.getAttribute('challenge_hidden') || '';
+                    challenge_visual = e.getAttribute('challenge_visual') || '';
+                    e.parentNode.innerHTML = content_css + content_html.replace('@callback@', callback).replace('@hosticon@', hosticon).replace('@challenge_hidden@', challenge_hidden).replace('@challenge_visual@', challenge_visual);
                 }
-
-
             });
         </script>
 
